@@ -10,17 +10,15 @@ import pandas as pd
 
 
 if __name__ == '__main__':
-    thisList = np.empty((0,3))
+    theList = np.empty(0)
     
-    a = np.array([[1,2,3],
-                 [4,5,6],
-                 [7,8,9]])
+    a = np.array([0,0,0,0])
+    b = np.array([1,1,1,1])
     
-    b = np.array([[0,5,3],
-             [4,5,6]
-             ])
-    
+
     for i in (a,b):
-        thisList = np.vstack((thisList, i))
-    print thisList
+        theList = np.append(theList, [[m]for m in i])
+    
+    print theList
+    
         

@@ -34,8 +34,15 @@ class data_sampler:
         num_feature = df.drop(['No.','Class','Label'], axis=1).shape[1]
         
         # init
-        self.trn_data = {'descs':np.empty((0,num_feature)),'target':[],'class':[]}
-        self.tst_data = {'descs':np.empty((0,num_feature)),'target':[],'class':[]}
+        self.trn_data = {'descs':np.empty((0,num_feature)),
+                         'target':np.empty(0),
+                         'class':np.empty(0)
+                                          }
+        
+        self.tst_data = {'descs':np.empty((0,num_feature)),
+                         'target':np.empty(0),
+                         'class':np.empty(0)
+                                          }
         
         # sample for each class, if less than 'num_trn_each_class'
         # left 'num_test_left' then put the rest to the training data
@@ -51,16 +58,20 @@ class data_sampler:
             else:
                 trn_this = this_data[:-num_test_left]
                 tst_this = this_data[-num_test_left:]
+            
 
             # pack to dictionary
-            self.trn_data['target'].extend(trn_this['Label'].values)
-            self.trn_data['class'].extend(trn_this['Class'].values)
-            self.trn_data['descs']= np.vstack((self.trn_data['descs'], trn_this.drop(['No.','Class','Label'],axis=1).values))
+            self.trn_data['target'] = np.append(self.trn_data['target'], [[eachLabel] for eachLabel in trn_this['Label'].values])
+            self.trn_data['class'] = np.append(self.trn_data['class'], [[eachClass] for eachClass in trn_this['Class'].values])
+            self.trn_data['descs']= np.vstack((self.trn_data['descs'], 
+                                               trn_this.drop(['No.','Class','Label'],axis=1).values))
             
-            self.tst_data['target'].extend(tst_this['Label'].values)
-            self.tst_data['class'].extend(tst_this['Class'].values)
-            self.tst_data['descs']= np.vstack((self.tst_data['descs'], tst_this.drop(['No.','Class','Label'],axis=1).values))
             
+            self.tst_data['target'] = np.append(self.tst_data['target'], [[eachLabel] for eachLabel in tst_this['Label'].values])
+            self.tst_data['class'] = np.append(self.tst_data['class'], [[eachClass] for eachClass in tst_this['Class'].values])
+            
+            self.tst_data['descs']= np.vstack((self.tst_data['descs'], 
+                                               tst_this.drop(['No.','Class','Label'],axis=1).values))
         
 if __name__ == '__main__':
     df = pd.ExcelFile('../data/1103_new_ten_functional_use_descs.xlsx').parse('Sheet1')
