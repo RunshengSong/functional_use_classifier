@@ -4,7 +4,10 @@ Created on Apr 29, 2015
 @author: rsong_admin
 '''
 import classifier
+import sys
+sys.path.insert(0,'..')
 
+from make_training_data import data_sampler
 import numpy as np
 import csv
 
@@ -15,7 +18,8 @@ from matplotlib import style
 style.use('ggplot')
 
 def dataCleaning():
-    df = pd.read_csv('./data/5299chem_76d_Jan4.csv',header=0)
+#     df = pd.read_csv('./data/5299chem_76d_Jan4.csv',header=0)
+    df = pd.ExcelFile('../../data/1103_new_ten_functional_use_descs.xlsx').parse('Sheet1')
     df = df.drop(['No.'],axis = 1)
     subset = df.columns[:-1]
     df = df.dropna(subset=subset,how='all') #this drop rows that has all values equal to NA
@@ -145,8 +149,8 @@ def sec_plotting():
 if __name__ == '__main__': 
     # training
     trn_data_all, tst_data_all, all_data = dataCleaning()
-    np.savetxt('./data/training_data.csv',trn_data_all,delimiter=',')
-    raw_input()
+#     np.savetxt('./data/training_data.csv',trn_data_all,delimiter=',')
+
     # the last colunm is the label 
     all_data_descs = all_data[:,:-1]
     all_data_target = all_data[:,-1]

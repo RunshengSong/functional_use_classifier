@@ -61,17 +61,25 @@ class data_sampler:
             
 
             # pack to dictionary
-            self.trn_data['target'] = np.append(self.trn_data['target'], [[eachLabel] for eachLabel in trn_this['Label'].values])
-            self.trn_data['class'] = np.append(self.trn_data['class'], [[eachClass] for eachClass in trn_this['Class'].values])
+            self.trn_data['target'] = np.append(self.trn_data['target'], [int(eachLabel) for eachLabel in trn_this['Label'].values])
+            self.trn_data['class'] = np.append(self.trn_data['class'], [eachClass for eachClass in trn_this['Class'].values])
             self.trn_data['descs']= np.vstack((self.trn_data['descs'], 
                                                trn_this.drop(['No.','Class','Label'],axis=1).values))
             
             
-            self.tst_data['target'] = np.append(self.tst_data['target'], [[eachLabel] for eachLabel in tst_this['Label'].values])
-            self.tst_data['class'] = np.append(self.tst_data['class'], [[eachClass] for eachClass in tst_this['Class'].values])
+            self.tst_data['target'] = np.append(self.tst_data['target'], [int(eachLabel) for eachLabel in tst_this['Label'].values])
+            self.tst_data['class'] = np.append(self.tst_data['class'], [eachClass for eachClass in tst_this['Class'].values])
             
             self.tst_data['descs']= np.vstack((self.tst_data['descs'], 
                                                tst_this.drop(['No.','Class','Label'],axis=1).values))
+
+        # change type
+        self.trn_data['target'] = self.trn_data['target'].astype(int)
+        self.tst_data['target'] = self.tst_data['target'].astype(int)
+        
+        # to one-hot
+        self.trn_data['target'] = np.eye(num_class)[self.trn_data['target']]
+        self.tst_data['target'] = np.eye(num_class)[self.tst_data['target']]
         
 if __name__ == '__main__':
     df = pd.ExcelFile('../data/1103_new_ten_functional_use_descs.xlsx').parse('Sheet1')
