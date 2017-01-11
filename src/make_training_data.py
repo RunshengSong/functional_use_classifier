@@ -54,7 +54,8 @@ class data_sampler:
 
             if len(this_data)>=num_trn_each_class:
                 trn_this = this_data[0:num_trn_each_class]
-                tst_this = this_data[num_trn_each_class:]
+#                 tst_this = this_data[num_trn_each_class:]
+                tst_this = this_data[-num_test_left:]
             else:
                 trn_this = this_data[:-num_test_left]
                 tst_this = this_data[-num_test_left:]

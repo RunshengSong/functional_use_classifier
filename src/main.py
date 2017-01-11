@@ -42,20 +42,35 @@ def plot_class(classes):
 
 def create_classifier():
 #     df = pd.ExcelFile('../data/data_tst.xlsx').parse('Sheet1')
-    df = pd.ExcelFile('../data/1103_new_ten_functional_use_descs.xlsx').parse('Sheet1')
+#     df = pd.ExcelFile('../data/1103_new_ten_functional_use_descs.xlsx').parse('Sheet1')
+    
+    df = pd.read_csv('../data/0109_nine_functional_use_descs.csv',header=0)
     this_data = data_sampler()
     this_data.sample_data(df)
 
-    # layer sizes
-    x_size = this_data.trn_data['descs'].shape[1]
-    h_size = 1024 # hidden layer
-    y_size = this_data.trn_data['target'].shape[1]
-    
+#     trn_data_df = pd.read_csv('../data/trn_data.csv',header=0)
+#     tst_data_df = pd.read_csv('../data/tst_data.csv',header=0)
+#     
+#     trn_Y = trn_data_df['Label'].values
+#     trn_Y = np.eye(len(np.unique(trn_Y)))[trn_Y] # to one-hot encoding
+#     trn_X = trn_data_df.drop(['Class','Label','No.'], axis=1).values
+#     
+#     tst_Y = tst_data_df['Label'].values
+#     tst_Y = np.eye(len(np.unique(tst_Y)))[tst_Y] # to one-hot encoding
+#     tst_X = tst_data_df.drop(['Class','Label','No.'], axis=1).values
+
+    # data
     trn_X = this_data.trn_data['descs']
     trn_Y = this_data.trn_data['target']
-
+ 
     tst_X = this_data.tst_data['descs']
     tst_Y = this_data.tst_data['target']
+
+    
+    # layer sizes
+    x_size = trn_X.shape[1]
+    h_size = 32 # hidden layer
+    y_size = trn_Y.shape[1]
     
     # transform data
     vec = StandardScaler()
@@ -63,7 +78,7 @@ def create_classifier():
 
     # symbols
     X = tf.placeholder("float",shape=[None, x_size])
-    y = tf.placeholder("float",shape=[None, 10])
+    y = tf.placeholder("float",shape=[None, 9])
     
     # weights
     w1 = init_weight((x_size,h_size))
@@ -75,26 +90,26 @@ def create_classifier():
 
     # backward propagation
     cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(yhat,y))
-    updates = tf.train.GradientDescentOptimizer(0.1).minimize(cost)
+    updates = tf.train.GradientDescentOptimizer(0.01).minimize(cost)
 
     sess = tf.Session()
     init = tf.global_variables_initializer()
     sess.run(init)
     
-    for epoch in range(400):
+    for epoch in range(200):
         for i in range(len(trn_X)):
             sess.run(updates, feed_dict={X:trn_X[i:i+1], y:trn_Y[i:i+1]})
         
         trn_acc = np.mean(np.argmax(trn_Y, axis=1) == sess.run(pred, feed_dict={X:trn_X, y:trn_Y}))
         tst_acc = np.mean(np.argmax(tst_Y, axis=1) == sess.run(pred, feed_dict={X:tst_X, y:tst_Y}))
-        
+
 #         print np.argmax(trn_Y, axis=1)
 #         print sess.run(pred, feed_dict={X:trn_X, y:trn_Y})
 #         print yhat
 #         raw_input()
         print("Epoch = %d, Training Accuracy = %.2f%%, Testing Accuracy = %.2f%%" % (epoch + 1, 100. * trn_acc, 100. * tst_acc))
     
-    target_name = np.unique(this_data.tst_data['class'])
+    target_name = np.unique(df['Class'])
     final_pred = sess.run(pred, feed_dict={X:tst_X, y:tst_Y})
     
     this_report = classification_report(np.argmax(tst_Y, axis=1), final_pred, target_names = target_name)
