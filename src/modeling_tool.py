@@ -3,7 +3,7 @@ Created on Dec 21, 2016
 
 @author: rsong_admin
 '''
-
+import json
 import numpy as np
 import pandas as pd
 from make_training_data import data_sampler
@@ -14,23 +14,28 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import classification_report
 from sklearn.metrics import confusion_matrix
 
+import matplotlib.pyplot as plt 
+
 BATCH_SIZE = 1
 
 class create_functional_use_classifier:
-    def __init__(self, sess, scalar):
+    def __init__(self, savefile,D=None, num_neroun=None, K=None):
         '''
         create functional use classifier
         '''
-        self.sess = sess
-        self.scaler = scalar
+
+        self.savefile = savefile
+        if D and K and num_neroun:
+            print 'rebuild'
+            self.build(D,num_neroun,K)
     
-    def fit_scaler(self, trn_data, tst_data):
+    def fit_scaler(self, scaler, trn_data, tst_data):
         '''
         fit sklearn standard scaler
         '''
-        self.scaler.fit(trn_data)
+        scaler.fit(trn_data)
 
-        return self.scaler.transform(trn_data), self.scaler.transform(tst_data)
+        return scaler.transform(trn_data), scaler.transform(tst_data), scaler
         
     def _feedforward(self, X, w1, w2):
         '''
@@ -44,78 +49,137 @@ class create_functional_use_classifier:
         weights = tf.random_normal(shape,stddev = 0.1)
         return tf.Variable(weights)
     
+    def _error_rate(self,p,t):
+        return np.mean(p != t)
+    
+    def build(self,input_size,num_neroun,output_size, learning_rate=0.01 ):
+        '''
+        build the structure of the network
+        only one hidden layer for now
+        '''        
+        # symbols
+        self.X = tf.placeholder("float",shape=[None, input_size])
+        self.y = tf.placeholder("float",shape=[None, output_size])
+        
+        # weights
+        self.w1 = self._init_weights((input_size, num_neroun))
+        self.w2 = self._init_weights((num_neroun, output_size))
+        
+        # init feedforward
+        y_ = self._feedforward(self.X, self.w1, self.w2)
+        self.pred = tf.argmax(y_, dimension=1)
+
+        # init back propagation
+        cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y_, self.y))
+        updates = tf.train.GradientDescentOptimizer(learning_rate).minimize(cost)
+        
+        # saver
+        self.saver = tf.train.Saver({'w1': self.w1, 'w2':self.w2})
+        return updates
+    
     def train(self, trn_X, trn_Y, tst_X, tst_Y, 
               num_epoch=200, num_neroun = 64, learning_rate = 0.01, 
               verbose=True):
         '''
         train
         '''
+        # data dimension
+        N, D = trn_X.shape
+        K = trn_Y.shape[1]
+        
         # layer sizes
         x_size = trn_X.shape[1]
         h_size = num_neroun # hidden layer
         y_size = trn_Y.shape[1]
         
-        # symbols
-        X = tf.placeholder("float",shape=[None, x_size])
-        y = tf.placeholder("float",shape=[None, y_size])
-        
-        # weights
-        w1 = self._init_weights((x_size, h_size))
-        w2 = self._init_weights((h_size, y_size))
-        
-        # init feedforward
-        y_ = self._feedforward(X, w1, w2)
-        pred = tf.argmax(y_, dimension=1)
-
-        
-        # init back propagation
-        cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y_, y))
-        updates = tf.train.GradientDescentOptimizer(learning_rate).minimize(cost)
-        
+        # init cost/update function
+        updates = self.build(input_size=x_size,num_neroun=h_size,output_size = y_size, learning_rate=0.01)
         # init session
         init = tf.global_variables_initializer()
-        self.sess.run(init)
+        costs = []
+        with tf.Session() as sess:
+            sess.run(init)
+            for epoch in range(num_epoch):
+                for i in range(0, len(trn_X),BATCH_SIZE):
+                    sess.run(updates, feed_dict={self.X:trn_X[i:i+BATCH_SIZE], self.y:trn_Y[i:i+BATCH_SIZE]})
+                
+                trn_acc = np.mean(np.argmax(trn_Y, axis=1) == sess.run(self.pred, feed_dict={self.X:trn_X, self.y:trn_Y}))
+                tst_acc = np.mean(np.argmax(tst_Y, axis=1) == sess.run(self.pred, feed_dict={self.X:tst_X, self.y:tst_Y}))
+                costs.append(tst_acc)
+                print("Epoch = %d, Training Accuracy = %.2f%%, Testing Accuracy = %.2f%%" % (epoch + 1, 100. * trn_acc, 100. * tst_acc))
         
-        for epoch in range(num_epoch):
-            for i in range(0, len(trn_X),BATCH_SIZE):
-                self.sess.run(updates, feed_dict={X:trn_X[i:i+BATCH_SIZE], y:trn_Y[i:i+BATCH_SIZE]})
+            self.saver.save(sess,self.savefile)
+      
+        self.D = D
+        self.K = K
+        self.num_neroun = num_neroun
+        
+        plt.plot(costs)
+        plt.show()
+        
+    def predict(self, tst_X):
+        ''' classify input tst_data (X) '''
+#         y_ = self._feedforward(X, w1, w2)
+        with tf.Session() as sess:
+            # restore the model
+            self.saver.restore(sess, self.savefile)
+            this_pred = sess.run(self.pred, feed_dict={self.X:tst_X})
+        return this_pred
+    
+    def score(self,X,Y):  
+        return 1 - self._error_rate(self.predict(X), np.argmax(Y,axis=1))
+        
+    def save_model(self, model_name):
+        ''' save to disk '''
+        j = {
+          'D': self.D,
+          'num_neroun': self.num_neroun,
+          'K': self.K,
+          'model': self.savefile
+        }
+        with open(model_name, 'w') as f:
+            json.dump(j, f)
+        print("model saved")
             
-            trn_acc = np.mean(np.argmax(trn_Y, axis=1) == self.sess.run(pred, feed_dict={X:trn_X, y:trn_Y}))
-            tst_acc = np.mean(np.argmax(tst_Y, axis=1) == self.sess.run(pred, feed_dict={X:tst_X, y:tst_Y}))
-            print("Epoch = %d, Training Accuracy = %.2f%%, Testing Accuracy = %.2f%%" % (epoch + 1, 100. * trn_acc, 100. * tst_acc))
-        
-        print classification_report(np.argmax(tst_Y,axis=1), self.sess.run(pred, feed_dict={X:tst_X, y:tst_Y}))
-        print confusion_matrix(np.argmax(tst_Y,axis=1), self.sess.run(pred, feed_dict={X:tst_X, y:tst_Y}))
-        
-    def score(self, network, trn_data ,tst_data):
-        pass
-        
-
+    @staticmethod    
+    def load_model(model_name):
+        ''' load sess from file '''
+        with open(model_name) as f:
+            j = json.load(f)
+        return create_functional_use_classifier(j['model'], j['D'],j['num_neroun'], j['K'])
 
 if __name__ == '__main__':
     
     # load data
-    df = pd.read_csv('../data/0109_nine_functional_use_descs.csv',header=0)
+    df = pd.read_csv('../data/1103_new_ten_functional_use_descs.csv',header=0)
     
     this_data = data_sampler()
-    this_data.sample_data(df, num_test_left=30)
+    this_data.sample_data(df, num_test_left=50)
+    
     trn_X = this_data.trn_data['descs']
     trn_Y = this_data.trn_data['target']
     tst_X = this_data.tst_data['descs']
     tst_Y = this_data.tst_data['target']
-    
+    target_names = np.unique(this_data.trn_data['class'])
+
     from collections import Counter
     print Counter(this_data.trn_data['class'])
-
+    print Counter(this_data.tst_data['class'])
     raw_input()
-    # init
 
-    this_classifier = create_functional_use_classifier(tf.Session(), StandardScaler())
-    trn_X, tst_X = this_classifier.fit_scaler(trn_X, tst_X)
+    # init
+    this_classifier = create_functional_use_classifier('../net/tensorflow_classifier_Jan12.model')
+    trn_X, tst_X, vec = this_classifier.fit_scaler(StandardScaler(),trn_X, tst_X)
     
+    # training
+    this_classifier.train(trn_X,trn_Y,tst_X,tst_Y, num_epoch=400, num_neroun=64,learning_rate=0.01)
+    print classification_report(np.argmax(tst_Y,axis=1), this_classifier.predict(tst_X),target_names=target_names)
+    print confusion_matrix(np.argmax(tst_Y,axis=1), this_classifier.predict(tst_X))
+
+    this_classifier.save_model('../net/tensorflow_classifier_Jan12.json')
     
-    this_classifier.train(trn_X,trn_Y,tst_X,tst_Y)
-    
-    
-    
+    # load model back and test
+#     model = create_functional_use_classifier.load_model('../net/tensorflow_classifier_Jan12.json')
+#     print 'testing accuracy:', model.score(tst_X, tst_Y)
+
     
