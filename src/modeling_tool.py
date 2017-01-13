@@ -142,7 +142,7 @@ class create_functional_use_classifier:
           'D': self.D,
           'num_neroun': self.num_neroun,
           'K': self.K,
-          'model': self.savefile,
+          'model': self.savefile
         }
         with open(model_name, 'w') as f:
             json.dump(j, f)
@@ -203,16 +203,13 @@ if __name__ == '__main__':
     target_names = np.unique(this_data.trn_data['class'])
     
     # run test
-    thisTest = ClassifyChemical('../net/tensorflow_classifier_Jan12.json')
-    tst_X = thisTest.fit_data(scaler_path, tst_X)
-    print tst_X
-    raw_input()
-    
-    pred = thisTest.predict(tst_X)
-    acc = np.mean(np.argmax(tst_Y) == pred)
-    
-    print acc
-    
+    thisTest = create_functional_use_classifier.load_model('../net/tensorflow_classifier_Jan12.json')
+    scaler = joblib.load(scaler_path)
+    tst_X = scaler.transform(tst_X)
+    thisPred = thisTest.predict(tst_X)
+    acc = np.mean(np.argmax(tst_Y,axis=1) == thisPred)
+    print np.argmax(tst_Y,axis=1)
+    print thisPred
     
     
     
