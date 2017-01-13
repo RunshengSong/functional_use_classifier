@@ -13,10 +13,12 @@ import tensorflow as tf
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import classification_report
 from sklearn.metrics import confusion_matrix
+from sklearn.externals import joblib
 
 import matplotlib.pyplot as plt 
 
 BATCH_SIZE = 1
+RUGULARIZATION = 0.
 
 class create_functional_use_classifier:
     def __init__(self, savefile,D=None, num_neroun=None, K=None):
@@ -33,9 +35,10 @@ class create_functional_use_classifier:
         '''
         fit sklearn standard scaler
         '''
-        scaler.fit(trn_data)
-
-        return scaler.transform(trn_data), scaler.transform(tst_data), scaler
+        self.scaler = scaler
+        self.scaler.fit(trn_data)
+        
+        return self.scaler.transform(trn_data), self.scaler.transform(tst_data), self.scaler
         
     def _feedforward(self, X, w1, w2):
         '''
@@ -71,6 +74,10 @@ class create_functional_use_classifier:
 
         # init back propagation
         cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y_, self.y))
+        
+        # add regularization term
+        cost += RUGULARIZATION * (tf.nn.l2_loss(self.w1) + tf.nn.l2_loss(self.w2))
+        
         updates = tf.train.GradientDescentOptimizer(learning_rate).minimize(cost)
         
         # saver
@@ -135,10 +142,14 @@ class create_functional_use_classifier:
           'D': self.D,
           'num_neroun': self.num_neroun,
           'K': self.K,
-          'model': self.savefile
+          'model': self.savefile,
         }
         with open(model_name, 'w') as f:
             json.dump(j, f)
+        # save scaler
+        if self.scaler:
+            joblib.dump(self.scaler, self.savefile+'_scaler.pkl',compress=True)
+            
         print("model saved")
             
     @staticmethod    
@@ -147,39 +158,64 @@ class create_functional_use_classifier:
         with open(model_name) as f:
             j = json.load(f)
         return create_functional_use_classifier(j['model'], j['D'],j['num_neroun'], j['K'])
+    
+class ClassifyChemical:
+    def __init__(self, input_model_json_path):
+        # load
+        self.this_classifier = self._load_model(input_model_json_path)
+        
+    def _load_model(self,model_name_json):
+        with open(model_name_json) as f:
+            j = json.load(f)
+        return create_functional_use_classifier(j['model'], j['D'],j['num_neroun'], j['K'])
+    
+    def fit_data(self,scaler_path, tst_X):
+        ''' fit the test data using the input scaler '''
+        scaler = joblib.load(scaler_path)
+        return scaler.transform(tst_X)
+    
+    def predict(self,tst_X):
+        with tf.Session() as sess:
+            # restore the model
+            self.this_classifier.saver.restore(sess, self.this_classifier.savefile)
+            this_pred = sess.run(self.this_classifier.pred, feed_dict={self.this_classifier.X:tst_X})
+        return this_pred
+        
+        
 
 if __name__ == '__main__':
     
+    # unit test here
+    
     # load data
-    df = pd.read_csv('../data/1103_new_ten_functional_use_descs.csv',header=0)
+    df = pd.read_csv('../data/0109_nine_functional_use_descs.csv',header=0)
+    scaler_path = '../net/tensorflow_classifier_Jan12_scaler.pkl'
     
     this_data = data_sampler()
     this_data.sample_data(df, num_test_left=50)
-    
-    trn_X = this_data.trn_data['descs']
-    trn_Y = this_data.trn_data['target']
-    tst_X = this_data.tst_data['descs']
+
+    # only load test data and add bias
+    tst_X_raw = this_data.tst_data['descs']
+    N_tst, M_tst = tst_X_raw.shape
+    tst_X = np.ones((N_tst, M_tst+1))
+    tst_X[:, 1:] = tst_X_raw
     tst_Y = this_data.tst_data['target']
     target_names = np.unique(this_data.trn_data['class'])
-
-    from collections import Counter
-    print Counter(this_data.trn_data['class'])
-    print Counter(this_data.tst_data['class'])
+    
+    # run test
+    thisTest = ClassifyChemical('../net/tensorflow_classifier_Jan12.json')
+    tst_X = thisTest.fit_data(scaler_path, tst_X)
+    print tst_X
     raw_input()
-
-    # init
-    this_classifier = create_functional_use_classifier('../net/tensorflow_classifier_Jan12.model')
-    trn_X, tst_X, vec = this_classifier.fit_scaler(StandardScaler(),trn_X, tst_X)
     
-    # training
-    this_classifier.train(trn_X,trn_Y,tst_X,tst_Y, num_epoch=400, num_neroun=64,learning_rate=0.01)
-    print classification_report(np.argmax(tst_Y,axis=1), this_classifier.predict(tst_X),target_names=target_names)
-    print confusion_matrix(np.argmax(tst_Y,axis=1), this_classifier.predict(tst_X))
-
-    this_classifier.save_model('../net/tensorflow_classifier_Jan12.json')
+    pred = thisTest.predict(tst_X)
+    acc = np.mean(np.argmax(tst_Y) == pred)
     
-    # load model back and test
-#     model = create_functional_use_classifier.load_model('../net/tensorflow_classifier_Jan12.json')
-#     print 'testing accuracy:', model.score(tst_X, tst_Y)
-
+    print acc
     
+    
+    
+    
+    
+    
+        
