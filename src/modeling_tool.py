@@ -44,7 +44,7 @@ class create_functional_use_classifier:
         '''
         feed forward for one hidden-layers nn
         '''
-        h1 = tf.nn.sigmoid(tf.matmul(X, w1))
+        h1 = tf.nn.relu(tf.matmul(X, w1))
         y_ = tf.matmul(h1, w2)
         return y_
     
@@ -73,7 +73,7 @@ class create_functional_use_classifier:
         self.pred = tf.argmax(y_, dimension=1)
 
         # init back propagation
-        cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y_, self.y))
+        cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self.y, logits=y_))
         
         # add regularization term
         cost += RUGULARIZATION * (tf.nn.l2_loss(self.w1) + tf.nn.l2_loss(self.w2))
@@ -184,11 +184,49 @@ class ClassifyChemical:
         
 
 if __name__ == '__main__':
-    
     # unit test here
-    
     # load data
-    df = pd.read_csv('../data/0109_nine_functional_use_descs.csv',header=0)
+    df = pd.read_csv('../data/descs/0314_6_functional_use_descs.csv',header=0)
+    
+    
+    # sample and split data
+    this_data = data_sampler()
+    this_data.sample_data(df, num_test_left=30)
+    
+    trn_X_raw = this_data.trn_data['descs']
+    
+    # add bias here
+    N,M = trn_X_raw.shape
+    trn_X = np.ones((N, M+1))
+    trn_X[:, 1:] = trn_X_raw
+    trn_Y = this_data.trn_data['target']
+    
+    tst_X_raw = this_data.tst_data['descs']
+    N_tst, M_tst = tst_X_raw.shape
+    tst_X = np.ones((N_tst, M_tst+1))
+    tst_X[:, 1:] = tst_X_raw
+    tst_Y = this_data.tst_data['target']
+    target_names = np.unique(this_data.trn_data['class'])
+    
+    from collections import Counter
+    print Counter(this_data.trn_data['class'])
+    print Counter(this_data.tst_data['class'])
+    
+    this_classifier = create_functional_use_classifier('../net/tensorflow_classifier_Mar14')
+    trn_X, tst_X, vec = this_classifier.fit_scaler(StandardScaler(),trn_X, tst_X)
+    
+    # training
+    this_classifier.train(trn_X,trn_Y,tst_X,tst_Y, num_epoch=600, num_neroun=128,learning_rate=0.01)
+    
+    # print out the training results
+    print classification_report(np.argmax(tst_Y,axis=1), this_classifier.predict(tst_X),target_names=target_names)
+    print confusion_matrix(np.argmax(tst_Y,axis=1), this_classifier.predict(tst_X))
+    
+    
+    
+    raw_input()
+    # load data
+    df = pd.read_csv('../data/descs/0109_nine_functional_use_descs.csv',header=0)
     scaler_path = '../net/tensorflow_classifier_Jan12_scaler.pkl'
     
     this_data = data_sampler()
