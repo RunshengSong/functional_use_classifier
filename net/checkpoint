@@ -1,2 +1,2 @@
-model_checkpoint_path: "tensorflow_classifier_Mar14"
-all_model_checkpoint_paths: "tensorflow_classifier_Mar14"
+model_checkpoint_path: "functional_use_classifier_nine_class_Mar15.ckpt"
+all_model_checkpoint_paths: "functional_use_classifier_nine_class_Mar15.ckpt"

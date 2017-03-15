@@ -78,7 +78,7 @@ class create_functional_use_classifier:
         # add regularization term
         cost += RUGULARIZATION * (tf.nn.l2_loss(self.w1) + tf.nn.l2_loss(self.w2))
         
-        updates = tf.train.GradientDescentOptimizer(learning_rate).minimize(cost)
+        updates = tf.train.AdamOptimizer(learning_rate).minimize(cost)
         
         # saver
         self.saver = tf.train.Saver({'w1': self.w1, 'w2':self.w2})
